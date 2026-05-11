@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using SemanticVersioning;
 using System;
 
-namespace EquipmentsAR;
+namespace noRepairLoss_Server;
 
 public record ModMetadata : AbstractModMetadata {
    public override string ModGuid { get; init; } = "com.luckyy.NoRepairLoss";
@@ -26,10 +26,16 @@ public record ModMetadata : AbstractModMetadata {
 [Injectable(TypePriority = OnLoadOrder.PostDBModLoader + 1)]
 public class RepairWipeHook(DatabaseServer databaseServer) : IOnLoad {
    public Task OnLoad() {
-      Console.WriteLine("[NRL Server] Initializing 0 Repair Loss patch...");
+      Console.WriteLine("[NRL Server] Initializing No Repair Loss patch...");
 
-      var itemsDb = databaseServer.GetTables().Templates.Items;
+      var tables = databaseServer.GetTables();
+      var itemsDb = tables.Templates.Items;
+      var globals = tables.Globals;
+
       int modifiedCount = 0;
+      int modifiedMaterialsCount = 0;
+
+
 
       foreach(var item in itemsDb.Values) {
          var props = item.Properties;
@@ -45,7 +51,24 @@ public class RepairWipeHook(DatabaseServer databaseServer) : IOnLoad {
          }
       }
 
-      Console.WriteLine($"[NRL Server] Successfully removed repair loss from {modifiedCount} items");
+      if (globals?.Configuration?.ArmorMaterials != null) {
+         foreach (var materialKvp in globals.Configuration.ArmorMaterials) {
+            var material = materialKvp.Value;
+            if (material != null) {
+               if (material.MinRepairDegradation > 0 || material.MaxRepairDegradation > 0 || 
+                  material.MinRepairKitDegradation > 0 || material.MaxRepairKitDegradation > 0) {
+
+                  material.MinRepairDegradation = 0;
+                  material.MaxRepairDegradation = 0;
+                  material.MinRepairKitDegradation = 0;
+                  material.MaxRepairKitDegradation = 0;
+                  modifiedMaterialsCount++;
+               }
+            }
+         }
+      }
+
+      Console.WriteLine($"[NRL Server] Successfully removed repair loss from {modifiedCount} items and {modifiedMaterialsCount} armor materials");
 
       return Task.CompletedTask;
    }
